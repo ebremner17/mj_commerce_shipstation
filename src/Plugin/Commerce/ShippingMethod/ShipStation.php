@@ -227,9 +227,25 @@ class ShipStation extends ShippingMethodBase {
       return $rates;
     }
 
+    // Get the country code from the shipment object.
+    $country_code = $shipment->getShippingProfile()->get('address')->getValue()[0]['country_code'];
+
+    // Get the shipping methods, so that we can get shipping method id.
+    $shipping_method_storage = \Drupal::entityTypeManager()->getStorage('commerce_shipping_method');
+    $shipping_methods = $shipping_method_storage->loadMultiple();
+
+    // Step through all the shipping methods, all we want is the
+    // first one, which will give us the correct shipping method id.
+    foreach ($shipping_methods as $shipping_method_id => $sm) {
+      break;
+    }
+
     // Step through each of the services (types of shipping) and
     // set the rates array.
     foreach ($this->services as $key => $service) {
+
+      // Flag to tell if we use this rate, dependent on country.
+      $insert_rate = TRUE;
 
       // Set the price based on the key.
       // DOM.RP - Canada Regular Parcel.
@@ -238,26 +254,42 @@ class ShipStation extends ShippingMethodBase {
       switch ($key) {
         case 'DOM.RP':
           $price = new Price('12','CAD');
+
+          if ($country_code !== 'CA') {
+            $insert_rate = FALSE;
+          }
           break;
 
         case 'DOM.EP':
           $price = new Price('18','CAD');
+
+          if ($country_code !== 'CA') {
+            $insert_rate = FALSE;
+          }
+
           break;
 
         case 'USA.XP':
           $price = new Price('20','CAD');
+
+          if ($country_code !== 'US') {
+            $insert_rate = FALSE;
+          }
           break;
       }
 
       // Setup the definition for the shipping rates.
       $definition = [
-        'shipping_method_id' => 3,
+        'shipping_method_id' => $shipping_method_id,
         'service' => $this->services[$key],
         'amount' => $price,
       ];
 
-      // Insert in the rates array.
-      $rates[] = new ShippingRate( $definition);
+      // Insert in the rates array if we are in the
+      // correct country.
+      if ($insert_rate) {
+        $rates[] = new ShippingRate($definition);
+      }
     }
 
     // Return the rates.
