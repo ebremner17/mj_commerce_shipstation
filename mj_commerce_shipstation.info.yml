@@ -1,0 +1,7 @@
+name: Commerce Ship Station
+type: module
+description: Provides Commerce integration for the Ship Station.
+core_version_requirement: ^9
+package: Commerce Ship Station
+dependencies:
+  - commerce:commerce_shipping
