@@ -27,6 +27,7 @@ use CanadaPost\Rating;
  *    "DOM.EP" = @Translation("Expedited Parcel - Canada"),
  *    "DOM.RP" = @Translation("Regular Parcel - Canada"),
  *    "USA.XP" = @Translation("Xpresspost - USA"),
+ *    "Free" = @Translation("Free shipping"),
  *   }
  * )
  */
@@ -183,10 +184,13 @@ class ShipStation extends ShippingMethodBase {
    */
   public function submitConfigurationForm(array &$form, FormStateInterface $form_state) {
 
+    // Get the values from the parent.
     $values = $form_state->getValue($form['#parents']);
 
+    // Save the config for the shipping.
     $this->configuration['api_key'] = $values['api_information']['api_key'];
     $this->configuration['api_secret'] = $values['api_information']['api_secret'];
+    $this->configuration['shipping_information']['origin_postal_code'] = $values['shipping_information']['origin_postal_code'];
 
     return parent::submitConfigurationForm($form, $form_state);
   }
@@ -234,6 +238,9 @@ class ShipStation extends ShippingMethodBase {
     $shipping_method_storage = \Drupal::entityTypeManager()->getStorage('commerce_shipping_method');
     $shipping_methods = $shipping_method_storage->loadMultiple();
 
+    // Get the total price.
+    $total_price = $shipment->getOrder()->getTotalPrice()->getNumber();
+
     // Step through all the shipping methods, all we want is the
     // first one, which will give us the correct shipping method id.
     foreach ($shipping_methods as $shipping_method_id => $sm) {
@@ -245,7 +252,7 @@ class ShipStation extends ShippingMethodBase {
     foreach ($this->services as $key => $service) {
 
       // Flag to tell if we use this rate, dependent on country.
-      $insert_rate = TRUE;
+      $insert_rate = FALSE;
 
       // Set the price based on the key.
       // DOM.RP - Canada Regular Parcel.
@@ -255,16 +262,16 @@ class ShipStation extends ShippingMethodBase {
         case 'DOM.RP':
           $price = new Price('12','CAD');
 
-          if ($country_code !== 'CA') {
-            $insert_rate = FALSE;
+          if ($country_code == 'CA' && (int) $total_price <= 100) {
+            $insert_rate = TRUE;
           }
           break;
 
         case 'DOM.EP':
           $price = new Price('18','CAD');
 
-          if ($country_code !== 'CA') {
-            $insert_rate = FALSE;
+          if ($country_code == 'CA' && (int) $total_price <= 100) {
+            $insert_rate = TRUE;
           }
 
           break;
@@ -272,8 +279,16 @@ class ShipStation extends ShippingMethodBase {
         case 'USA.XP':
           $price = new Price('20','CAD');
 
-          if ($country_code !== 'US') {
-            $insert_rate = FALSE;
+          if ($country_code == 'US' && (int) $total_price <= 100) {
+            $insert_rate = TRUE;
+          }
+          break;
+
+        case "Free":
+          $price = new Price('0','CAD');
+
+          if ((int) $total_price > 100) {
+            $insert_rate = TRUE;
           }
           break;
       }
